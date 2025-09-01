@@ -5,6 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Telegram 身份验证</title>
     <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -65,16 +71,73 @@
             margin: 8px;
             text-decoration: none;
             display: inline-block;
+            transition: background-color 0.3s;
         }
         
         .login-button:hover {
             background: #006699;
         }
         
+        .status {
+            margin: 20px 0;
+            padding: 16px;
+            border-radius: 8px;
+            font-size: 14px;
+            display: none;
+        }
+        
+        .status.success {
+            background: #e8f5e8;
+            color: #2e7d32;
+            border: 1px solid #c8e6c9;
+        }
+        
+        .status.error {
+            background: #ffebee;
+            color: #c62828;
+            border: 1px solid #ffcdd2;
+        }
+        
+        .user-info {
+            background: #f5f5f5;
+            border-radius: 8px;
+            padding: 16px;
+            margin: 16px 0;
+            text-align: left;
+            display: none;
+        }
+        
+        .user-info h3 {
+            color: #333;
+            font-size: 16px;
+            margin-bottom: 8px;
+        }
+        
+        .user-info p {
+            color: #666;
+            font-size: 14px;
+            margin: 4px 0;
+        }
+        
         .footer {
             margin-top: 24px;
             color: #999;
             font-size: 12px;
+        }
+        
+        .debug-info {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            padding: 12px;
+            margin: 16px 0;
+            font-size: 12px;
+            text-align: left;
+            display: none;
+        }
+        
+        .debug-info.show {
+            display: block;
         }
     </style>
 </head>
@@ -88,10 +151,26 @@
             登录后将自动返回应用
         </p>
         
-        <a href="https://oauth.telegram.org/auth?bot_id=YOUR_BOT_ID&request_access=write&origin=https://swepthong.github.io" 
+        <!-- 替换 YOUR_BOT_ID 为你的实际 Bot ID -->
+        <a href="https://oauth.telegram.org/auth?bot_id=8495651464:AAES9pR_BBbBr06aikgpopNYkEd7d2GeJeo&request_access=write&origin=https://swepthong.github.io" 
            class="login-button">
             使用 Telegram 登录
         </a>
+        
+        <div id="status" class="status"></div>
+        
+        <div id="user-info" class="user-info">
+            <h3>用户信息</h3>
+            <p><strong>ID:</strong> <span id="user-id"></span></p>
+            <p><strong>姓名:</strong> <span id="user-name"></span></p>
+            <p><strong>用户名:</strong> <span id="user-username"></span></p>
+        </div>
+        
+        <!-- 调试信息 -->
+        <div id="debug-info" class="debug-info">
+            <strong>调试信息:</strong><br>
+            <span id="debug-content"></span>
+        </div>
         
         <div class="footer">
             AIDR 项目身份验证系统
@@ -99,28 +178,87 @@
     </div>
     
     <script>
-        // 检查 URL 参数，处理回调
+        // 调试函数
+        function debugLog(message) {
+            console.log(message);
+            const debugEl = document.getElementById('debug-content');
+            const debugInfo = document.getElementById('debug-info');
+            debugEl.innerHTML += message + '<br>';
+            debugInfo.classList.add('show');
+        }
+        
+        // 显示状态
+        function showStatus(type, message) {
+            const statusEl = document.getElementById('status');
+            statusEl.className = `status ${type}`;
+            statusEl.innerHTML = message;
+            statusEl.style.display = 'block';
+            debugLog(`状态更新: ${type} - ${message}`);
+        }
+        
+        // 显示用户信息
+        function showUserInfo(user) {
+            document.getElementById('user-id').textContent = user.id;
+            document.getElementById('user-name').textContent = user.first_name;
+            document.getElementById('user-username').textContent = user.username || '无';
+            document.getElementById('user-info').style.display = 'block';
+            debugLog(`显示用户信息: ${user.first_name} (ID: ${user.id})`);
+        }
+        
+        // 重定向到 Android 应用
+        function redirectToApp(user) {
+            const userJson = encodeURIComponent(JSON.stringify(user));
+            const redirectUrl = `aidr://telegram-auth?user=${userJson}`;
+            
+            debugLog(`准备重定向: ${redirectUrl}`);
+            
+            setTimeout(() => {
+                window.location.href = redirectUrl;
+            }, 2000);
+        }
+        
+        // 检查 URL 参数，处理 OAuth 回调
         function checkAuthCallback() {
             const urlParams = new URLSearchParams(window.location.search);
             const hash = urlParams.get('hash');
             const user = urlParams.get('user');
+            const auth_date = urlParams.get('auth_date');
+            
+            debugLog(`检查回调参数: hash=${hash}, user=${user}, auth_date=${auth_date}`);
             
             if (hash && user) {
                 try {
                     const userData = JSON.parse(decodeURIComponent(user));
-                    console.log('收到用户信息:', userData);
+                    debugLog('收到用户信息: ' + JSON.stringify(userData));
                     
-                    // 重定向到 Android 应用
-                    const redirectUrl = `aidr://telegram-auth?user=${encodeURIComponent(JSON.stringify(userData))}`;
-                    window.location.href = redirectUrl;
+                    showStatus('success', '✅ 身份验证成功！正在返回应用...');
+                    showUserInfo(userData);
+                    redirectToApp(userData);
+                    
                 } catch (e) {
-                    console.error('解析用户数据失败:', e);
+                    debugLog('解析用户数据失败: ' + e.message);
+                    showStatus('error', '❌ 解析用户数据失败: ' + e.message);
                 }
+            } else {
+                debugLog('未检测到 OAuth 回调参数');
             }
         }
         
         // 页面加载时检查回调
-        document.addEventListener('DOMContentLoaded', checkAuthCallback);
+        document.addEventListener('DOMContentLoaded', function() {
+            debugLog('页面加载完成');
+            debugLog('当前 URL: ' + window.location.href);
+            debugLog('协议: ' + window.location.protocol);
+            debugLog('主机名: ' + window.location.hostname);
+            
+            checkAuthCallback();
+        });
+        
+        // 错误处理
+        window.addEventListener('error', function(e) {
+            debugLog('页面错误: ' + e.error);
+            showStatus('error', '❌ 页面加载出错，请刷新重试');
+        });
     </script>
 </body>
 </html>
