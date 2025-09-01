@@ -1,0 +1,199 @@
+<!-- auth.html -->
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Telegram 登录成功</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            padding: 40px;
+            max-width: 400px;
+            width: 100%;
+            text-align: center;
+        }
+        
+        .logo {
+            width: 80px;
+            height: 80px;
+            margin: 0 auto 24px;
+            background: #0088cc;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 32px;
+            font-weight: bold;
+        }
+        
+        .success {
+            color: #28a745;
+            font-size: 24px;
+            font-weight: bold;
+            margin-bottom: 16px;
+        }
+        
+        .user-info {
+            background: #f5f5f5;
+            border-radius: 8px;
+            padding: 16px;
+            margin: 16px 0;
+            text-align: left;
+        }
+        
+        .user-info p {
+            margin: 4px 0;
+            font-size: 14px;
+            color: #666;
+        }
+        
+        .footer {
+            margin-top: 24px;
+            color: #999;
+            font-size: 12px;
+        }
+        
+        .spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 2px solid #f3f3f3;
+            border-top: 2px solid #0088cc;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 8px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="logo">✓</div>
+        
+        <div class="success">登录成功！</div>
+        
+        <p id="status">
+            <span class="spinner"></span>
+            正在处理登录信息...
+        </p>
+        
+        <div id="user-info" class="user-info" style="display: none;">
+            <p><strong>用户 ID:</strong> <span id="user-id"></span></p>
+            <p><strong>姓名:</strong> <span id="user-name"></span></p>
+            <p><strong>用户名:</strong> <span id="user-username"></span></p>
+            <p><strong>认证时间:</strong> <span id="auth-date"></span></p>
+        </div>
+        
+        <div class="footer">
+            正在返回应用...
+        </div>
+    </div>
+    
+    <script>
+        // 解析 URL 参数
+        function getUrlParams() {
+            const params = new URLSearchParams(window.location.search);
+            const result = {};
+            
+            // 获取所有参数
+            for (const [key, value] of params) {
+                result[key] = value;
+            }
+            
+            return result;
+        }
+        
+        // 处理登录成功
+        function handleLoginSuccess() {
+            const params = getUrlParams();
+            
+            console.log('收到的参数:', params);
+            
+            // 检查必要的参数
+            if (params.id && params.first_name && params.hash) {
+                const user = {
+                    id: parseInt(params.id),
+                    first_name: decodeURIComponent(params.first_name),
+                    username: params.username ? decodeURIComponent(params.username) : null,
+                    photo_url: params.photo_url ? decodeURIComponent(params.photo_url) : null,
+                    auth_date: parseInt(params.auth_date),
+                    hash: params.hash
+                };
+                
+                console.log('解析的用户信息:', user);
+                
+                // 显示用户信息
+                showUserInfo(user);
+                
+                // 重定向到 Android 应用
+                redirectToApp(user);
+                
+            } else {
+                console.error('缺少必要的登录参数');
+                document.getElementById('status').innerHTML = '❌ 登录信息不完整，请重试';
+            }
+        }
+        
+        // 显示用户信息
+        function showUserInfo(user) {
+            document.getElementById('user-id').textContent = user.id;
+            document.getElementById('user-name').textContent = user.first_name;
+            document.getElementById('user-username').textContent = user.username || '无';
+            document.getElementById('auth-date').textContent = new Date(user.auth_date * 1000).toLocaleString();
+            document.getElementById('user-info').style.display = 'block';
+            document.getElementById('status').innerHTML = '✅ 登录信息处理完成';
+        }
+        
+        // 重定向到 Android 应用
+        function redirectToApp(user) {
+            const userJson = encodeURIComponent(JSON.stringify(user));
+            const redirectUrl = `aidr://telegram-auth?user=${userJson}`;
+            
+            console.log('重定向 URL:', redirectUrl);
+            
+            // 延迟重定向
+            setTimeout(() => {
+                window.location.href = redirectUrl;
+            }, 2000);
+        }
+        
+        // 页面加载完成后处理
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('auth 页面加载完成');
+            console.log('当前 URL:', window.location.href);
+            
+            handleLoginSuccess();
+        });
+        
+        // 错误处理
+        window.addEventListener('error', function(e) {
+            console.error('页面错误:', e.error);
+            document.getElementById('status').innerHTML = '❌ 处理登录信息时出错';
+        });
+    </script>
+</body>
+</html>
