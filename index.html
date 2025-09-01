@@ -1,0 +1,280 @@
+<!-- index.html -->
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Telegram 身份验证</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            padding: 40px;
+            max-width: 400px;
+            width: 100%;
+            text-align: center;
+        }
+        
+        .logo {
+            width: 80px;
+            height: 80px;
+            margin: 0 auto 24px;
+            background: #0088cc;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 32px;
+            font-weight: bold;
+        }
+        
+        h1 {
+            color: #333;
+            font-size: 24px;
+            font-weight: 600;
+            margin-bottom: 16px;
+        }
+        
+        .description {
+            color: #666;
+            font-size: 16px;
+            line-height: 1.5;
+            margin-bottom: 32px;
+        }
+        
+        .login-widget {
+            margin: 24px 0;
+        }
+        
+        .status {
+            margin: 20px 0;
+            padding: 16px;
+            border-radius: 8px;
+            font-size: 14px;
+            display: none;
+        }
+        
+        .status.loading {
+            background: #e3f2fd;
+            color: #1976d2;
+            border: 1px solid #bbdefb;
+        }
+        
+        .status.success {
+            background: #e8f5e8;
+            color: #2e7d32;
+            border: 1px solid #c8e6c9;
+        }
+        
+        .status.error {
+            background: #ffebee;
+            color: #c62828;
+            border: 1px solid #ffcdd2;
+        }
+        
+        .user-info {
+            background: #f5f5f5;
+            border-radius: 8px;
+            padding: 16px;
+            margin: 16px 0;
+            text-align: left;
+            display: none;
+        }
+        
+        .user-info h3 {
+            color: #333;
+            font-size: 16px;
+            margin-bottom: 8px;
+        }
+        
+        .user-info p {
+            color: #666;
+            font-size: 14px;
+            margin: 4px 0;
+        }
+        
+        .footer {
+            margin-top: 24px;
+            color: #999;
+            font-size: 12px;
+        }
+        
+        .spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 2px solid #f3f3f3;
+            border-top: 2px solid #0088cc;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 8px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="logo">T</div>
+        
+        <h1>Telegram 身份验证</h1>
+        <p class="description">
+            请使用 Telegram 账号登录以验证身份<br>
+            登录后将自动返回应用
+        </p>
+        
+        <div id="status" class="status loading">
+            <span class="spinner"></span>
+            正在检查登录状态...
+        </div>
+        
+        <div id="telegram-login-widget" class="login-widget"></div>
+        
+        <div id="user-info" class="user-info">
+            <h3>用户信息</h3>
+            <p><strong>ID:</strong> <span id="user-id"></span></p>
+            <p><strong>姓名:</strong> <span id="user-name"></span></p>
+            <p><strong>用户名:</strong> <span id="user-username"></span></p>
+        </div>
+        
+        <div class="footer">
+            AIDR 项目身份验证系统
+        </div>
+    </div>
+    
+    <!-- Telegram Login Widget 脚本 -->
+    <script src="https://telegram.org/js/telegram-widget.js"></script>
+    <script>
+        // 全局变量
+        let isAuthenticated = false;
+        let userData = null;
+        
+        // 显示状态
+        function showStatus(type, message) {
+            const statusEl = document.getElementById('status');
+            statusEl.className = `status ${type}`;
+            statusEl.innerHTML = message;
+            statusEl.style.display = 'block';
+        }
+        
+        // 隐藏状态
+        function hideStatus() {
+            document.getElementById('status').style.display = 'none';
+        }
+        
+        // 显示用户信息
+        function showUserInfo(user) {
+            document.getElementById('user-id').textContent = user.id;
+            document.getElementById('user-name').textContent = user.first_name;
+            document.getElementById('user-username').textContent = user.username || '无';
+            document.getElementById('user-info').style.display = 'block';
+        }
+        
+        // 隐藏登录组件
+        function hideLoginWidget() {
+            document.getElementById('telegram-login-widget').style.display = 'none';
+        }
+        
+        // 重定向到 Android 应用
+        function redirectToApp(user) {
+            const userJson = encodeURIComponent(JSON.stringify(user));
+            const redirectUrl = `aidr://telegram-auth?user=${userJson}`;
+            
+            console.log('重定向到应用:', redirectUrl);
+            
+            // 延迟重定向，让用户看到成功信息
+            setTimeout(() => {
+                window.location.href = redirectUrl;
+            }, 2000);
+        }
+        
+        // 初始化 Telegram Login Widget
+        function initTelegramWidget() {
+            console.log('初始化 Telegram Login Widget...');
+            
+            // 创建 Telegram Login Widget
+            window.Telegram.Login.widget(
+                document.getElementById('telegram-login-widget'),
+                {
+                    data_auth_url: 'https://swepthong.io/telegram-login-page/auth',
+                    data_onauth: function(user) {
+                        console.log('Telegram 用户信息:', user);
+                        
+                        // 保存用户数据
+                        userData = user;
+                        isAuthenticated = true;
+                        
+                        // 显示成功状态
+                        showStatus('success', '✅ 身份验证成功！正在返回应用...');
+                        
+                        // 显示用户信息
+                        showUserInfo(user);
+                        
+                        // 隐藏登录组件
+                        hideLoginWidget();
+                        
+                        // 重定向到 Android 应用
+                        redirectToApp(user);
+                    }
+                }
+            );
+            
+            // 检查是否已经登录
+            setTimeout(() => {
+                if (!isAuthenticated) {
+                    hideStatus();
+                    console.log('用户未登录，显示登录按钮');
+                }
+            }, 3000);
+        }
+        
+        // 页面加载完成后初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('页面加载完成，开始初始化...');
+            
+            // 检查是否支持 Telegram Login Widget
+            if (typeof window.Telegram === 'undefined') {
+                showStatus('error', '❌ Telegram Login Widget 加载失败，请刷新页面重试');
+                return;
+            }
+            
+            // 初始化 Widget
+            initTelegramWidget();
+        });
+        
+        // 错误处理
+        window.addEventListener('error', function(e) {
+            console.error('页面错误:', e.error);
+            showStatus('error', '❌ 页面加载出错，请刷新重试');
+        });
+        
+        // 处理页面可见性变化
+        document.addEventListener('visibilitychange', function() {
+            if (document.visibilityState === 'visible' && isAuthenticated) {
+                console.log('页面重新可见，用户已认证');
+            }
+        });
+    </script>
+</body>
+</html>
