@@ -5,7 +5,77 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Telegram 身份验证</title>
     <style>
-        /* 样式保持不变 */
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            padding: 40px;
+            max-width: 400px;
+            width: 100%;
+            text-align: center;
+        }
+        
+        .logo {
+            width: 80px;
+            height: 80px;
+            margin: 0 auto 24px;
+            background: #0088cc;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 32px;
+            font-weight: bold;
+        }
+        
+        h1 {
+            color: #333;
+            font-size: 24px;
+            font-weight: 600;
+            margin-bottom: 16px;
+        }
+        
+        .description {
+            color: #666;
+            font-size: 16px;
+            line-height: 1.5;
+            margin-bottom: 32px;
+        }
+        
+        .login-button {
+            background: #0088cc;
+            color: white;
+            border: none;
+            padding: 16px 32px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            margin: 8px;
+            text-decoration: none;
+            display: inline-block;
+        }
+        
+        .login-button:hover {
+            background: #006699;
+        }
+        
+        .footer {
+            margin-top: 24px;
+            color: #999;
+            font-size: 12px;
+        }
     </style>
 </head>
 <body>
@@ -18,7 +88,10 @@
             登录后将自动返回应用
         </p>
         
-        <div id="telegram-login-widget"></div>
+        <a href="https://oauth.telegram.org/auth?bot_id=YOUR_BOT_ID&request_access=write&origin=https://swepthong.github.io" 
+           class="login-button">
+            使用 Telegram 登录
+        </a>
         
         <div class="footer">
             AIDR 项目身份验证系统
@@ -26,118 +99,28 @@
     </div>
     
     <script>
-        // 方法1：使用 iframe 方式
-        function createTelegramWidget() {
-            const widgetContainer = document.getElementById('telegram-login-widget');
+        // 检查 URL 参数，处理回调
+        function checkAuthCallback() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const hash = urlParams.get('hash');
+            const user = urlParams.get('user');
             
-            // 创建 iframe
-            const iframe = document.createElement('iframe');
-            iframe.src = 'https://telegram.org/js/telegram-widget.js';
-            iframe.style.border = 'none';
-            iframe.style.width = '100%';
-            iframe.style.height = '60px';
-            
-            widgetContainer.appendChild(iframe);
-        }
-        
-        // 方法2：使用动态脚本加载
-        function loadTelegramWidget() {
-            const script = document.createElement('script');
-            script.src = 'https://telegram.org/js/telegram-widget.js';
-            script.onload = function() {
-                console.log('Telegram 脚本加载成功');
-                initWidget();
-            };
-            script.onerror = function() {
-                console.error('Telegram 脚本加载失败');
-                showFallback();
-            };
-            document.head.appendChild(script);
-        }
-        
-        function initWidget() {
-            try {
-                if (typeof window.Telegram !== 'undefined' && window.Telegram.Login) {
-                    console.log('Telegram 对象可用:', window.Telegram);
+            if (hash && user) {
+                try {
+                    const userData = JSON.parse(decodeURIComponent(user));
+                    console.log('收到用户信息:', userData);
                     
-                    // 尝试不同的 API 方法
-                    if (window.Telegram.Login.widget) {
-                        window.Telegram.Login.widget(
-                            document.getElementById('telegram-login-widget'),
-                            {
-                                data_auth_url: 'https://swepthong.github.io/telegram-login-page/auth',
-                                data_onauth: function(user) {
-                                    console.log('用户登录成功:', user);
-                                    redirectToApp(user);
-                                }
-                            }
-                        );
-                    } else if (window.Telegram.Login.auth) {
-                        window.Telegram.Login.auth(
-                            document.getElementById('telegram-login-widget'),
-                            {
-                                data_auth_url: 'https://swepthong.github.io/telegram-login-page/auth',
-                                data_onauth: function(user) {
-                                    console.log('用户登录成功:', user);
-                                    redirectToApp(user);
-                                }
-                            }
-                        );
-                    } else {
-                        console.error('Telegram Login API 不可用');
-                        showFallback();
-                    }
-                } else {
-                    console.error('Telegram 对象未定义');
-                    showFallback();
+                    // 重定向到 Android 应用
+                    const redirectUrl = `aidr://telegram-auth?user=${encodeURIComponent(JSON.stringify(userData))}`;
+                    window.location.href = redirectUrl;
+                } catch (e) {
+                    console.error('解析用户数据失败:', e);
                 }
-            } catch (error) {
-                console.error('初始化失败:', error);
-                showFallback();
             }
         }
         
-        function showFallback() {
-            const container = document.getElementById('telegram-login-widget');
-            container.innerHTML = `
-                <div style="text-align: center; padding: 20px;">
-                    <p style="color: #666; margin-bottom: 16px;">Telegram 登录组件暂时不可用</p>
-                    <button onclick="openTelegramApp()" style="
-                        background: #0088cc;
-                        color: white;
-                        border: none;
-                        padding: 12px 24px;
-                        border-radius: 8px;
-                        cursor: pointer;
-                        font-size: 16px;
-                    ">
-                        打开 Telegram 应用
-                    </button>
-                </div>
-            `;
-        }
-        
-        function openTelegramApp() {
-            // 打开 Telegram 应用
-            window.location.href = 'https://t.me/';
-        }
-        
-        function redirectToApp(user) {
-            const userJson = encodeURIComponent(JSON.stringify(user));
-            const redirectUrl = `aidr://telegram-auth?user=${userJson}`;
-            
-            console.log('重定向到应用:', redirectUrl);
-            
-            setTimeout(() => {
-                window.location.href = redirectUrl;
-            }, 2000);
-        }
-        
-        // 页面加载完成后初始化
-        document.addEventListener('DOMContentLoaded', function() {
-            console.log('页面加载完成，开始加载 Telegram Widget...');
-            loadTelegramWidget();
-        });
+        // 页面加载时检查回调
+        document.addEventListener('DOMContentLoaded', checkAuthCallback);
     </script>
 </body>
 </html>
