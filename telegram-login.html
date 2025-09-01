@@ -200,24 +200,26 @@
         
         // 处理 OAuth 回调
         function handleOAuthCallback() {
-            const params = new URLSearchParams(window.location.search);
-            const hash = params.get('hash');
+            const urlParams = new URLSearchParams(window.location.search);
+            const urlHash = window.location.hash;
             
             debugLog('当前 URL: ' + window.location.href);
             debugLog('URL 参数: ' + window.location.search);
-            debugLog('Hash 参数: ' + hash);
+            debugLog('URL Hash: ' + urlHash);
             
+            // 方法1: 检查 URL 参数中的 hash (旧格式)
+            const hash = urlParams.get('hash');
             if (hash) {
-                debugLog('检测到 OAuth 回调');
+                debugLog('检测到旧格式 OAuth 回调');
                 
                 try {
                     const user = {
-                        id: parseInt(params.get('id')),
-                        first_name: decodeURIComponent(params.get('first_name')),
-                        username: params.get('username') ? decodeURIComponent(params.get('username')) : null,
-                        photo_url: params.get('photo_url') ? decodeURIComponent(params.get('photo_url')) : null,
-                        auth_date: parseInt(params.get('auth_date')),
-                        hash: params.get('hash')
+                        id: parseInt(urlParams.get('id')),
+                        first_name: decodeURIComponent(urlParams.get('first_name')),
+                        username: urlParams.get('username') ? decodeURIComponent(urlParams.get('username')) : null,
+                        photo_url: urlParams.get('photo_url') ? decodeURIComponent(urlParams.get('photo_url')) : null,
+                        auth_date: parseInt(urlParams.get('auth_date')),
+                        hash: urlParams.get('hash')
                     };
                     
                     debugLog('解析的用户信息: ' + JSON.stringify(user));
@@ -225,13 +227,109 @@
                     showStatus('success', '✅ 登录成功！正在返回应用...');
                     showUserInfo(user);
                     redirectToApp(user);
+                    return;
                     
                 } catch (e) {
-                    debugLog('处理 OAuth 回调失败: ' + e.message);
+                    debugLog('处理旧格式 OAuth 回调失败: ' + e.message);
+                    showStatus('error', '❌ 处理登录信息失败: ' + e.message);
+                }
+            }
+            
+            // 方法2: 检查 URL Hash 中的 tgAuthResult (新格式)
+            if (urlHash && urlHash.includes('tgAuthResult=')) {
+                debugLog('检测到新格式 OAuth 回调 (tgAuthResult)');
+                
+                try {
+                    // 提取 tgAuthResult 参数
+                    const tgAuthResult = urlHash.split('tgAuthResult=')[1];
+                    debugLog('tgAuthResult 原始数据: ' + tgAuthResult);
+                    
+                    // 解码 Base64 数据
+                    const decodedData = atob(tgAuthResult);
+                    debugLog('解码后的数据: ' + decodedData);
+                    
+                    // 解析 JSON
+                    const authData = JSON.parse(decodedData);
+                    debugLog('解析的认证数据: ' + JSON.stringify(authData));
+                    
+                    // 构造用户对象
+                    const user = {
+                        id: authData.id,
+                        first_name: authData.first_name,
+                        username: authData.username || null,
+                        photo_url: authData.photo_url || null,
+                        auth_date: authData.auth_date,
+                        hash: authData.hash
+                    };
+                    
+                    debugLog('构造的用户信息: ' + JSON.stringify(user));
+                    
+                    showStatus('success', '✅ 登录成功！正在返回应用...');
+                    showUserInfo(user);
+                    redirectToApp(user);
+                    
+                } catch (e) {
+                    debugLog('处理新格式 OAuth 回调失败: ' + e.message);
+                    debugLog('错误详情: ' + e.stack);
                     showStatus('error', '❌ 处理登录信息失败: ' + e.message);
                 }
             }
         }
+        
+        // 测试解析函数
+        function testParseAuthResult(tgAuthResult) {
+            debugLog('=== 测试解析 tgAuthResult ===');
+            debugLog('输入数据: ' + tgAuthResult);
+            
+            try {
+                // 尝试不同的解码方式
+                
+                // 方法1: 直接 Base64 解码
+                try {
+                    const decoded1 = atob(tgAuthResult);
+                    debugLog('方法1 - Base64解码结果: ' + decoded1);
+                    const parsed1 = JSON.parse(decoded1);
+                    debugLog('方法1 - JSON解析结果: ' + JSON.stringify(parsed1));
+                } catch (e) {
+                    debugLog('方法1 失败: ' + e.message);
+                }
+                
+                // 方法2: URL 解码后再 Base64 解码
+                try {
+                    const urlDecoded = decodeURIComponent(tgAuthResult);
+                    debugLog('方法2 - URL解码结果: ' + urlDecoded);
+                    const decoded2 = atob(urlDecoded);
+                    debugLog('方法2 - Base64解码结果: ' + decoded2);
+                    const parsed2 = JSON.parse(decoded2);
+                    debugLog('方法2 - JSON解析结果: ' + JSON.stringify(parsed2));
+                } catch (e) {
+                    debugLog('方法2 失败: ' + e.message);
+                }
+                
+                // 方法3: 直接当作 JSON 解析
+                try {
+                    const parsed3 = JSON.parse(tgAuthResult);
+                    debugLog('方法3 - 直接JSON解析结果: ' + JSON.stringify(parsed3));
+                } catch (e) {
+                    debugLog('方法3 失败: ' + e.message);
+                }
+                
+                // 方法4: URL 解码后直接当作 JSON 解析
+                try {
+                    const urlDecoded = decodeURIComponent(tgAuthResult);
+                    const parsed4 = JSON.parse(urlDecoded);
+                    debugLog('方法4 - URL解码+JSON解析结果: ' + JSON.stringify(parsed4));
+                } catch (e) {
+                    debugLog('方法4 失败: ' + e.message);
+                }
+                
+            } catch (e) {
+                debugLog('测试解析失败: ' + e.message);
+            }
+        }
+        
+        // 暴露测试函数到全局
+        window.testParseAuthResult = testParseAuthResult;
         
         // 页面加载完成后处理
         document.addEventListener('DOMContentLoaded', function() {
@@ -250,4 +348,3 @@
     </script>
 </body>
 </html>
-
