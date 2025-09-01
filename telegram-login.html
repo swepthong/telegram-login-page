@@ -158,40 +158,15 @@
         <div class="subtitle">点击下方按钮使用 Telegram 账号登录<br>登录后将自动返回应用</div>
         
         <div style="margin-top: 32px;">
-            <button onclick="startBotLogin()" class="login-button" style="background: #25D366; font-size: 18px; padding: 20px 40px;">
+            <button onclick="startTelegramLogin()" class="login-button" style="background: #25D366; font-size: 18px; padding: 20px 40px;">
                 🤖 使用 Telegram 登录
             </button>
         </div>
         
-        <div style="margin-top: 24px;">
-            <button onclick="showManualReturnForm()" class="login-button" style="background: #6c757d; font-size: 14px; padding: 12px 24px;">
-                🔄 手动返回应用
+        <div style="margin-top: 16px;">
+            <button onclick="testBotCallback()" class="login-button" style="background: #17a2b8; font-size: 14px; padding: 12px 24px;">
+                🧪 测试回调
             </button>
-        </div>
-        
-        <!-- 手动返回表单 -->
-        <div id="manual-form" style="display: none; margin-top: 24px; padding: 20px; background: #f8f9fa; border-radius: 12px; border: 1px solid #dee2e6;">
-            <h4 style="margin: 0 0 20px 0; color: #333; text-align: center;">输入 Telegram 信息</h4>
-            <div style="margin-bottom: 16px;">
-                <label style="display: block; margin-bottom: 6px; font-weight: bold; color: #495057;">用户 ID (数字):</label>
-                <input type="number" id="userId" placeholder="例如: 123456789" style="width: 100%; padding: 12px; border: 1px solid #ced4da; border-radius: 6px; font-size: 16px;">
-            </div>
-            <div style="margin-bottom: 16px;">
-                <label style="display: block; margin-bottom: 6px; font-weight: bold; color: #495057;">姓名:</label>
-                <input type="text" id="firstName" placeholder="例如: 张三" style="width: 100%; padding: 12px; border: 1px solid #ced4da; border-radius: 6px; font-size: 16px;">
-            </div>
-            <div style="margin-bottom: 20px;">
-                <label style="display: block; margin-bottom: 6px; font-weight: bold; color: #495057;">用户名 (可选):</label>
-                <input type="text" id="username" placeholder="例如: zhangsan" style="width: 100%; padding: 12px; border: 1px solid #ced4da; border-radius: 6px; font-size: 16px;">
-            </div>
-            <div style="display: flex; gap: 12px;">
-                <button onclick="submitManualReturn()" class="login-button" style="background: #28a745; flex: 1; padding: 12px;">
-                    ✅ 确认返回
-                </button>
-                <button onclick="hideManualReturnForm()" class="login-button" style="background: #6c757d; flex: 1; padding: 12px;">
-                    ❌ 取消
-                </button>
-            </div>
         </div>
         
         <div id="status" class="status" style="display: none;"></div>
@@ -242,7 +217,7 @@
             }, 2000);
         }
         
-        // 处理 OAuth 回调
+        // 处理所有类型的回调
         function handleOAuthCallback() {
             const urlParams = new URLSearchParams(window.location.search);
             const urlHash = window.location.hash;
@@ -251,7 +226,27 @@
             debugLog('URL 参数: ' + window.location.search);
             debugLog('URL Hash: ' + urlHash);
             
-            // 方法1: 检查 URL 参数中的 hash (旧格式)
+            // 方法1: 检查 Bot 回调 (user 参数)
+            const userParam = urlParams.get('user');
+            if (userParam) {
+                debugLog('检测到 Bot 回调');
+                
+                try {
+                    const user = JSON.parse(decodeURIComponent(userParam));
+                    debugLog('Bot 回调用户信息: ' + JSON.stringify(user));
+                    
+                    showStatus('success', '✅ Bot 登录成功！正在返回应用...');
+                    showUserInfo(user);
+                    redirectToApp(user);
+                    return;
+                    
+                } catch (e) {
+                    debugLog('处理 Bot 回调失败: ' + e.message);
+                    showStatus('error', '❌ 处理 Bot 回调失败: ' + e.message);
+                }
+            }
+            
+            // 方法2: 检查 URL 参数中的 hash (旧格式 OAuth)
             const hash = urlParams.get('hash');
             if (hash) {
                 debugLog('检测到旧格式 OAuth 回调');
@@ -268,7 +263,7 @@
                     
                     debugLog('解析的用户信息: ' + JSON.stringify(user));
                     
-                    showStatus('success', '✅ 登录成功！正在返回应用...');
+                    showStatus('success', '✅ OAuth 登录成功！正在返回应用...');
                     showUserInfo(user);
                     redirectToApp(user);
                     return;
@@ -279,7 +274,7 @@
                 }
             }
             
-            // 方法2: 检查 URL Hash 中的 tgAuthResult (新格式)
+            // 方法3: 检查 URL Hash 中的 tgAuthResult (新格式 OAuth)
             if (urlHash && urlHash.includes('tgAuthResult=')) {
                 debugLog('检测到新格式 OAuth 回调 (tgAuthResult)');
                 
@@ -308,7 +303,7 @@
                     
                     debugLog('构造的用户信息: ' + JSON.stringify(user));
                     
-                    showStatus('success', '✅ 登录成功！正在返回应用...');
+                    showStatus('success', '✅ OAuth 登录成功！正在返回应用...');
                     showUserInfo(user);
                     redirectToApp(user);
                     
@@ -341,101 +336,80 @@
         
 
         
-        // Bot 登录方式（推荐）
-        function startBotLogin() {
-            debugLog('开始 Bot 登录流程');
+        // Telegram 官方登录方式
+        function startTelegramLogin() {
+            debugLog('开始 Telegram 官方登录流程');
             
             // 清除之前的状态
             clearPreviousState();
             
-            // 直接跳转到 Bot，用户只需要点击 Start 按钮
-            const botUrl = 'https://t.me/aidr_verification_bot?start=login_' + Date.now();
+            // 使用 Telegram 官方登录 Widget
+            const botId = '8495651464'; // 你的 Bot ID
+            const origin = 'https://swepthong.github.io';
+            const returnTo = 'https://swepthong.github.io/telegram-login-page/telegram-login.html';
             
-            debugLog('Bot URL: ' + botUrl);
-            showStatus('info', '正在跳转到 Telegram Bot...');
+            // 生成随机参数强制重新授权
+            const timestamp = Date.now();
+            const random = Math.random().toString(36).substring(7);
+            const state = `${timestamp}_${random}`;
             
-            // 跳转到 Bot
+            // 构建 OAuth URL
+            const oauthUrl = `https://oauth.telegram.org/auth?bot_id=${botId}&request_access=write&origin=${encodeURIComponent(origin)}&return_to=${encodeURIComponent(returnTo)}&state=${state}`;
+            
+            debugLog('OAuth URL: ' + oauthUrl);
+            showStatus('info', '正在跳转到 Telegram 授权页面...');
+            
+            // 跳转到 Telegram OAuth
             setTimeout(() => {
-                window.location.href = botUrl;
+                window.location.href = oauthUrl;
             }, 500);
-            
-            // 设置超时检测和提示
-            setTimeout(() => {
-                if (!window.location.hash.includes('tgAuthResult')) {
-                    showStatus('info', '如果 Bot 没有自动返回，请点击"手动返回应用"按钮');
-                    
-                    // 显示手动返回按钮提示
-                    const manualButton = document.querySelector('button[onclick="showManualReturnForm()"]');
-                    if (manualButton) {
-                        manualButton.style.background = '#ffc107';
-                        manualButton.style.animation = 'pulse 1s infinite';
-                    }
-                }
-            }, 8000);
         }
         
 
         
-        // 显示手动返回表单
-        function showManualReturnForm() {
-            document.getElementById('manual-form').style.display = 'block';
-            debugLog('显示手动返回表单');
-        }
+
         
-        // 隐藏手动返回表单
-        function hideManualReturnForm() {
-            document.getElementById('manual-form').style.display = 'none';
-            debugLog('隐藏手动返回表单');
-        }
+
         
-        // 提交手动返回
-        function submitManualReturn() {
-            const userId = document.getElementById('userId').value;
-            const firstName = document.getElementById('firstName').value;
-            const username = document.getElementById('username').value;
+        // 测试真实 Bot 回调
+        function testBotCallback() {
+            debugLog('测试真实 Bot 回调');
             
-            if (!userId || isNaN(userId)) {
-                showStatus('error', '❌ 请输入有效的用户 ID');
-                return;
-            }
-            
-            if (!firstName.trim()) {
-                showStatus('error', '❌ 请输入姓名');
-                return;
-            }
-            
-            // 构造用户数据
-            const userData = {
-                id: parseInt(userId),
-                first_name: firstName.trim(),
-                username: username.trim() || null,
+            // 模拟真实的 Telegram 用户数据（基于 Telegram Bot API 格式）
+            const realUser = {
+                id: 123456789,
+                first_name: "张三",
+                username: "zhangsan",
                 photo_url: null,
                 auth_date: Math.floor(Date.now() / 1000),
-                hash: "manual_return_" + Date.now()
+                hash: "real_bot_hash_" + Date.now()
             };
             
-            const userJson = encodeURIComponent(JSON.stringify(userData));
-            const redirectUrl = `aidr://telegram-auth?user=${userJson}`;
+            // 构造真实的回调 URL（Bot 会生成这样的链接）
+            const userJson = encodeURIComponent(JSON.stringify(realUser));
+            const realCallbackUrl = `https://swepthong.github.io/telegram-login-page/telegram-login.html?user=${userJson}`;
             
-            debugLog('手动返回 URL: ' + redirectUrl);
-            debugLog('用户数据: ' + JSON.stringify(userData));
-            showStatus('success', '✅ 正在返回应用...');
+            debugLog('真实回调 URL: ' + realCallbackUrl);
+            debugLog('用户数据: ' + JSON.stringify(realUser));
+            showStatus('info', '正在模拟真实 Bot 回调...');
             
-            // 隐藏表单
-            hideManualReturnForm();
-            
+            // 直接处理回调（不跳转，直接在当前页面处理）
             setTimeout(() => {
-                window.location.href = redirectUrl;
+                // 模拟 URL 参数
+                const url = new URL(window.location.href);
+                url.searchParams.set('user', userJson);
+                
+                // 更新 URL 但不刷新页面
+                window.history.replaceState({}, '', url.toString());
+                
+                // 触发回调处理
+                handleOAuthCallback();
             }, 1000);
         }
         
-
-        
         // 暴露函数到全局
-        window.startBotLogin = startBotLogin;
-        window.showManualReturnForm = showManualReturnForm;
-        window.hideManualReturnForm = hideManualReturnForm;
-        window.submitManualReturn = submitManualReturn;
+        window.startTelegramLogin = startTelegramLogin;
+        window.testBotCallback = testBotCallback;
         
         // 页面加载完成后处理
         document.addEventListener('DOMContentLoaded', function() {
